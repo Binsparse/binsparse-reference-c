@@ -12,6 +12,13 @@ static size_t product(const size_t *shape, size_t rank) {
   return size;
 }
 
+static size_t offset(const cnpy_c_array *array, const size_t *coord) {
+  size_t result = 0;
+  for (size_t d = 0; d < array->rank; ++d)
+    result += coord[d] * array->strides[d];
+  return result;
+}
+
 int main(int argc, char **argv) {
   cnpy_c_array dense = {0}, pattern = {0}, fill = {0};
   cJSON *header, *shape_json, *custom, *description;
@@ -34,8 +41,6 @@ int main(int argc, char **argv) {
   if (cnpy_c_load(argv[1], &dense) || cnpy_c_load(argv[2], &pattern) ||
       cnpy_c_load(argv[3], &fill))
     die("cannot read NPY input");
-  if (dense.fortran_order || pattern.fortran_order || fill.fortran_order)
-    die("Fortran-order NPY arrays are unsupported");
   if (dense.rank != pattern.rank || dense.size != pattern.size ||
       pattern.word_size != 1 || fill.size != 1)
     die("incompatible tensor, pattern, or fill-value NPY input");
@@ -81,11 +86,14 @@ int main(int argc, char **argv) {
 
   size_t value_index = 0;
   for (size_t linear = 0; linear < dense.size; ++linear) {
-    if (((uint8_t *) pattern.data)[linear]) {
+    size_t dense_offset = offset(&dense, logical_coord);
+    size_t pattern_offset = offset(&pattern, logical_coord);
+    if (((uint8_t *) pattern.data)[pattern_offset]) {
       push_entry(&entries, logical_coord, iso ? 0 : value_index);
       if (!iso || value_index == 0)
         memcpy((char *) values.data + (iso ? 0 : value_index) * dense.word_size,
-               (char *) dense.data + linear * dense.word_size, dense.word_size);
+               (char *) dense.data + dense_offset * dense.word_size,
+               dense.word_size);
       ++value_index;
     }
     for (int d = result.rank - 1; d >= 0; --d) {
@@ -114,6 +122,9 @@ int main(int argc, char **argv) {
     for (int d = 0; d < result.rank; ++d) result.transpose[d] = target_transpose[d];
   }
   apply_transpose(&entries, source_transpose, target_transpose);
+  bsp_array_t ordered_values = values_in_entry_order(values, &entries, iso);
+  bsp_destroy_array_t(&values);
+  values = ordered_values;
   for (int d = 0; d < result.rank; ++d) stored_dims[d] = result.dims[target_transpose[d]];
   root_ptr[0] = 0; root_ptr[1] = stored;
   result.level = build_level(&context, description, &entries, stored_dims, 0,

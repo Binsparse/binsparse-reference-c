@@ -41,6 +41,8 @@ entries_t tensor_to_coo(const bsp_tensor_t *tensor);
 entries_t matrix_to_coo(bsp_matrix_t *matrix);
 void apply_transpose(entries_t *entries, const size_t *source,
                      const size_t *target);
+bsp_array_t values_in_entry_order(const bsp_array_t source,
+                                  const entries_t *entries, bool iso);
 
 cJSON *predefined_level(const char *format, size_t *transpose, int rank);
 bsp_level_t *build_level(const reformat_context_t *context,

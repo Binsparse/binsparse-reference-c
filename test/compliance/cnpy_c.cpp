@@ -14,11 +14,25 @@ extern "C" int cnpy_c_load(const char *path, cnpy_c_array *out) {
     out->size = array.num_vals;
     out->word_size = array.word_size;
     out->rank = array.shape.size();
-    out->fortran_order = array.fortran_order;
     out->shape = static_cast<size_t *>(malloc(out->rank * sizeof(size_t)));
+    out->strides = static_cast<size_t *>(malloc(out->rank * sizeof(size_t)));
     out->data = malloc(array.num_bytes());
-    if ((out->rank && !out->shape) || (array.num_bytes() && !out->data)) return 1;
+    if ((out->rank && (!out->shape || !out->strides)) ||
+        (array.num_bytes() && !out->data))
+      return 1;
     if (out->rank) memcpy(out->shape, array.shape.data(), out->rank * sizeof(size_t));
+    size_t stride = 1;
+    if (array.fortran_order) {
+      for (size_t d = 0; d < out->rank; ++d) {
+        out->strides[d] = stride;
+        stride *= out->shape[d];
+      }
+    } else {
+      for (size_t d = out->rank; d-- > 0;) {
+        out->strides[d] = stride;
+        stride *= out->shape[d];
+      }
+    }
     if (array.num_bytes()) memcpy(out->data, array.data<char>(), array.num_bytes());
     return 0;
   } catch (const std::exception &) {
@@ -29,6 +43,7 @@ extern "C" int cnpy_c_load(const char *path, cnpy_c_array *out) {
 extern "C" void cnpy_c_destroy(cnpy_c_array *array) {
   free(array->data);
   free(array->shape);
+  free(array->strides);
   memset(array, 0, sizeof(*array));
 }
 

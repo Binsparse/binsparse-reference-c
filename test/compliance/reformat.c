@@ -171,6 +171,12 @@ void free_entries(entries_t *entries) {
 
 /* Expand one custom level.  begin/end identify the parent positions entering
  * the level; coordinates are stored row-wise in coords. */
+static size_t stored_dimension(const bsp_tensor_t *tensor, size_t depth) {
+  size_t logical = tensor->transpose ? tensor->transpose[depth] : depth;
+  if (logical >= (size_t) tensor->rank) die("transpose is not a permutation");
+  return tensor->dims[logical];
+}
+
 static void level_to_coo(const bsp_level_t *level, const bsp_tensor_t *tensor,
                          size_t depth, size_t parents, const size_t *coords,
                          entries_t *out) {
@@ -189,7 +195,7 @@ static void level_to_coo(const bsp_level_t *level, const bsp_tensor_t *tensor,
     const bsp_dense_t *dense = level->data;
     size_t width = 1, count, *next;
     for (int d = 0; d < dense->rank; ++d)
-      width *= tensor->dims[depth + (size_t) d];
+      width *= stored_dimension(tensor, depth + (size_t) d);
     count = parents * width;
     next = calloc(count * (size_t) tensor->rank, sizeof(*next));
     if (next == NULL && count != 0) die("out of memory");
@@ -200,7 +206,7 @@ static void level_to_coo(const bsp_level_t *level, const bsp_tensor_t *tensor,
                coords + p * (size_t) tensor->rank,
                depth * sizeof(*next));
         for (int d = dense->rank - 1; d >= 0; --d) {
-          size_t dim = tensor->dims[depth + (size_t) d];
+          size_t dim = stored_dimension(tensor, depth + (size_t) d);
           next[q * (size_t) tensor->rank + depth + (size_t) d] = n % dim;
           n /= dim;
         }
@@ -232,7 +238,7 @@ static void level_to_coo(const bsp_level_t *level, const bsp_tensor_t *tensor,
         for (int d = 0; d < sparse->rank; ++d) {
           size_t index = 0;
           bsp_array_read(sparse->indices[d], i, index);
-          if (index >= tensor->dims[depth + (size_t) d])
+          if (index >= stored_dimension(tensor, depth + (size_t) d))
             die("input coordinate is out of bounds");
           next[q * (size_t) tensor->rank + depth + (size_t) d] = index;
         }
@@ -401,8 +407,8 @@ void apply_transpose(entries_t *entries, const size_t *source,
   qsort(entries->entry, entries->size, sizeof(*entries->entry), compare_entry);
 }
 
-static bsp_array_t copy_values(const bsp_array_t source, const entries_t *entries,
-                               bool iso) {
+bsp_array_t values_in_entry_order(const bsp_array_t source,
+                                  const entries_t *entries, bool iso) {
   bsp_array_t values;
   size_t size = iso && entries->size != 0 ? 1 : entries->size;
   if (bsp_construct_array_t(&values, size, source.type) != BSP_SUCCESS)
@@ -661,7 +667,7 @@ bsp_error_t bsp_reformat_file(const char *input, const char *output,
     stored_dims[d] = source_is_tensor ? tensor.dims[logical]
                                     : (logical == 0 ? matrix.nrows : matrix.ncols);
   }
-  values = copy_values(source_values, &entries, iso);
+  values = values_in_entry_order(source_values, &entries, iso);
   bsp_tensor_t result = bsp_construct_default_tensor_t();
   result.rank = rank;
   result.nnz = entries.size;

@@ -12,7 +12,7 @@ typedef struct {
   size_t word_size;
   size_t rank;
   size_t *shape;
-  int fortran_order;
+  size_t *strides;
 } cnpy_c_array;
 
 int cnpy_c_load(const char *path, cnpy_c_array *array);
