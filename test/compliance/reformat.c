@@ -12,6 +12,9 @@
  * custom dense/sparse level trees are accepted.
  */
 
+#include "reformat.h"
+
+#include <binsparse/hdf5_wrapper.h>
 #include <binsparse/matrix_formats.h>
 #include <binsparse/read_matrix.h>
 #include <binsparse/read_tensor.h>
@@ -26,26 +29,37 @@
 #include <stdlib.h>
 #include <string.h>
 
-bsp_error_t bsp_read_attribute(char **attribute, hid_t f, char *name);
+bsp_type_t type_from_name(const char *name) {
+  size_t length;
+  char base[32];
+  if (name == NULL) return BSP_INVALID_TYPE;
+  length = strlen(name);
+  if (length > 5 && !strncmp(name, "iso[", 4) && name[length - 1] == ']') {
+    if (length - 5 >= sizeof(base)) return BSP_INVALID_TYPE;
+    memcpy(base, name + 4, length - 5);
+    base[length - 5] = '\0';
+    name = base;
+  }
+  for (int type = BSP_UINT8; type < BSP_INVALID_TYPE; ++type)
+    if (!strcmp(name, bsp_get_type_string((bsp_type_t) type)))
+      return (bsp_type_t) type;
+  return BSP_INVALID_TYPE;
+}
 
-typedef struct {
-  size_t *coord;
-  size_t value;
-} entry_t;
+static bsp_type_t requested_type(const reformat_context_t *context,
+                                 const char *key, bsp_type_t fallback) {
+  const char *name = cJSON_GetStringValue(
+      cJSON_GetObjectItemCaseSensitive(context->data_types, key));
+  bsp_type_t type = type_from_name(name);
+  return type == BSP_INVALID_TYPE ? fallback : type;
+}
 
-typedef struct {
-  entry_t *entry;
-  size_t size;
-  size_t capacity;
-  int rank;
-} entries_t;
-
-static void die(const char *message) {
+void die(const char *message) {
   fprintf(stderr, "reformat: %s\n", message);
   exit(EXIT_FAILURE);
 }
 
-static cJSON *read_json(const char *path) {
+cJSON *read_json(const char *path) {
   FILE *file = fopen(path, "rb");
   long size = 0;
   char *text;
@@ -66,7 +80,7 @@ static cJSON *read_json(const char *path) {
   return json;
 }
 
-static cJSON *input_header(const char *path) {
+cJSON *input_header(const char *path) {
   hid_t file = H5Fopen(path, H5F_ACC_RDONLY, H5P_DEFAULT);
   char *text = NULL;
   cJSON *outer, *header;
@@ -77,19 +91,68 @@ static cJSON *input_header(const char *path) {
   free(text);
   if (!cJSON_IsObject(outer)) die("invalid input Binsparse header");
   header = cJSON_DetachItemFromObjectCaseSensitive(outer, "binsparse");
+  if (header == NULL) {
+    header = outer;
+    outer = NULL;
+  }
   cJSON_Delete(outer);
   if (!cJSON_IsObject(header)) die("input has no binsparse header");
   return header;
 }
 
-static bool header_values_are_iso(cJSON *header) {
+bool header_values_are_iso(cJSON *header) {
   cJSON *types = cJSON_GetObjectItemCaseSensitive(header, "data_types");
   const char *value = cJSON_GetStringValue(
       cJSON_GetObjectItemCaseSensitive(types, "values"));
   return value != NULL && strncmp(value, "iso[", 4) == 0;
 }
 
-static void push_entry(entries_t *entries, const size_t *coord, size_t value) {
+bool header_has_fill(cJSON *header) {
+  return cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(header, "fill"));
+}
+
+static bsp_error_t read_fill_value(const char *path, bsp_array_t *value) {
+  hid_t file = H5Fopen(path, H5F_ACC_RDONLY, H5P_DEFAULT);
+  bsp_error_t error;
+  if (file < 0) return BSP_ERROR_IO;
+  error = bsp_read_array(value, file, "fill_value");
+  H5Fclose(file);
+  return error;
+}
+
+/* Preserve every supplied partial-header field and add its fill-value buffer. */
+void complete_output(const char *path, cJSON *requested,
+                     const bsp_array_t *fill_value) {
+  hid_t file = H5Fopen(path, H5F_ACC_RDWR, H5P_DEFAULT);
+  char *text = NULL, *updated;
+  cJSON *outer, *header, *item;
+  if (file < 0 || bsp_read_attribute(&text, file, "binsparse") != BSP_SUCCESS)
+    die("cannot reopen output header");
+  outer = cJSON_Parse(text);
+  free(text);
+  header = cJSON_GetObjectItemCaseSensitive(outer, "binsparse");
+  cJSON_ArrayForEach(item, requested) {
+    cJSON *copy = cJSON_Duplicate(item, 1);
+    if (cJSON_HasObjectItem(header, item->string))
+      cJSON_ReplaceItemInObjectCaseSensitive(header, item->string, copy);
+    else
+      cJSON_AddItemToObject(header, item->string, copy);
+  }
+  if (fill_value != NULL &&
+      bsp_write_array(file, "fill_value", *fill_value, 0) != BSP_SUCCESS)
+    die("cannot write fill_value");
+  /* Compliance containers store the Binsparse header directly. */
+  updated = cJSON_Print(header);
+  H5Adelete(file, "binsparse");
+  if (updated == NULL ||
+      bsp_write_attribute(file, "binsparse", updated) != BSP_SUCCESS)
+    die("cannot update output header");
+  free(updated);
+  cJSON_Delete(outer);
+  H5Fclose(file);
+}
+
+void push_entry(entries_t *entries, const size_t *coord, size_t value) {
   entry_t *item;
   if (entries->size == entries->capacity) {
     size_t capacity = entries->capacity == 0 ? 16 : 2 * entries->capacity;
@@ -99,13 +162,14 @@ static void push_entry(entries_t *entries, const size_t *coord, size_t value) {
     entries->capacity = capacity;
   }
   item = &entries->entry[entries->size++];
-  item->coord = malloc((size_t) entries->rank * sizeof(*item->coord));
+  item->coord = malloc((entries->rank ? (size_t) entries->rank : 1) *
+                       sizeof(*item->coord));
   if (item->coord == NULL) die("out of memory");
   memcpy(item->coord, coord, (size_t) entries->rank * sizeof(*coord));
   item->value = value;
 }
 
-static void free_entries(entries_t *entries) {
+void free_entries(entries_t *entries) {
   for (size_t i = 0; i < entries->size; ++i) free(entries->entry[i].coord);
   free(entries->entry);
 }
@@ -188,18 +252,18 @@ static void level_to_coo(const bsp_level_t *level, const bsp_tensor_t *tensor,
   die("unknown tensor level");
 }
 
-static entries_t tensor_to_coo(const bsp_tensor_t *tensor) {
+entries_t tensor_to_coo(const bsp_tensor_t *tensor) {
   entries_t result = {0};
   size_t *root;
   result.rank = tensor->rank;
-  root = calloc((size_t) tensor->rank, sizeof(*root));
+  root = calloc(tensor->rank ? (size_t) tensor->rank : 1, sizeof(*root));
   if (root == NULL) die("out of memory");
   level_to_coo(tensor->level, tensor, 0, 1, root, &result);
   free(root);
   return result;
 }
 
-static entries_t matrix_to_coo(bsp_matrix_t *matrix) {
+entries_t matrix_to_coo(bsp_matrix_t *matrix) {
   entries_t result = {0};
   result.rank = bsp_matrix_format_is_vector(matrix->format) ? 1 : 2;
   if (matrix->format == BSP_COOR || matrix->format == BSP_COOC ||
@@ -260,8 +324,8 @@ static entries_t matrix_to_coo(bsp_matrix_t *matrix) {
 }
 
 /* A predefined format is only a named view of a custom level tree. */
-static bsp_error_t write_predefined(const char *path, bsp_tensor_t tensor,
-                                    const char *format, int compression) {
+bsp_error_t write_predefined(const char *path, bsp_tensor_t tensor,
+                             const char *format, int compression) {
   bsp_matrix_t matrix;
   bsp_level_t *level = tensor.level;
   bsp_construct_default_matrix_t(&matrix);
@@ -322,9 +386,10 @@ static int compare_entry(const void *a_, const void *b_) {
   return 0;
 }
 
-static void apply_transpose(entries_t *entries, const size_t *source,
-                            const size_t *target) {
-  size_t *copy = malloc((size_t) entries->rank * sizeof(*copy));
+void apply_transpose(entries_t *entries, const size_t *source,
+                     const size_t *target) {
+  size_t *copy =
+      malloc((entries->rank ? (size_t) entries->rank : 1) * sizeof(*copy));
   if (copy == NULL) die("out of memory");
   for (size_t k = 0; k < entries->size; ++k) {
     memcpy(copy, entries->entry[k].coord,
@@ -364,10 +429,10 @@ static size_t prefix_equal(const entry_t *a, const entry_t *b, size_t depth,
 
 /* Recursively build a level.  parent_ptr partitions entries into incoming
  * fibers.  The entries are already lexicographically sorted. */
-static bsp_level_t *build_level(cJSON *description, const entries_t *entries,
-                                const size_t *dims, size_t depth,
-                                const size_t *parent_ptr, size_t parents,
-                                bool root, bsp_array_t values) {
+bsp_level_t *build_level(const reformat_context_t *context, cJSON *description,
+                         const entries_t *entries, const size_t *dims,
+                         size_t depth, const size_t *parent_ptr, size_t parents,
+                         bool root, bsp_array_t values) {
   cJSON *desc = cJSON_GetObjectItemCaseSensitive(description, "level_desc");
   bsp_level_t *level = calloc(1, sizeof(*level));
   const char *name = cJSON_GetStringValue(desc);
@@ -404,16 +469,25 @@ static bsp_level_t *build_level(cJSON *description, const entries_t *entries,
     sparse->indices = calloc((size_t) rank, sizeof(*sparse->indices));
     child_ptr = malloc((groups + 1) * sizeof(*child_ptr));
     if (sparse->indices == NULL || child_ptr == NULL) die("out of memory");
-    for (int d = 0; d < rank; ++d)
-      if (bsp_construct_array_t(&sparse->indices[d], groups,
-                                bsp_pick_integer_type(dims[depth + (size_t) d])) !=
+    for (int d = 0; d < rank; ++d) {
+      char key[64];
+      snprintf(key, sizeof(key), "indices_%zu", depth + (size_t) d);
+      if (bsp_construct_array_t(
+              &sparse->indices[d], groups,
+              requested_type(context, key,
+                             bsp_pick_integer_type(dims[depth + (size_t) d]))) !=
           BSP_SUCCESS)
         die("out of memory");
+    }
     if (!root) {
+      char key[64];
+      snprintf(key, sizeof(key), "pointers_to_%zu", depth);
       sparse->pointers_to = malloc(sizeof(*sparse->pointers_to));
       if (sparse->pointers_to == NULL ||
           bsp_construct_array_t(sparse->pointers_to, parents + 1,
-                                bsp_pick_integer_type(groups)) != BSP_SUCCESS)
+                                requested_type(context, key,
+                                               bsp_pick_integer_type(groups))) !=
+              BSP_SUCCESS)
         die("out of memory");
     }
     groups = 0;
@@ -440,8 +514,9 @@ static bsp_level_t *build_level(cJSON *description, const entries_t *entries,
       bsp_array_t pointers = *sparse->pointers_to;
       bsp_array_write(pointers, parents, groups);
     }
-    sparse->child = build_level(child_desc, entries, dims, depth + (size_t) rank,
-                                child_ptr, groups, false, values);
+    sparse->child = build_level(context, child_desc, entries, dims,
+                                depth + (size_t) rank, child_ptr, groups, false,
+                                values);
     free(child_ptr);
     level->kind = BSP_TENSOR_SPARSE;
     level->data = sparse;
@@ -477,7 +552,7 @@ static bsp_level_t *build_level(cJSON *description, const entries_t *entries,
     }
     child_ptr[children] = entries->size;
     dense->rank = rank;
-    dense->child = build_level(child_desc, entries, dims,
+    dense->child = build_level(context, child_desc, entries, dims,
                                depth + (size_t) rank, child_ptr, children,
                                false, values);
     free(child_ptr);
@@ -489,7 +564,7 @@ static bsp_level_t *build_level(cJSON *description, const entries_t *entries,
   return NULL;
 }
 
-static cJSON *predefined_level(const char *format, size_t *transpose, int rank) {
+cJSON *predefined_level(const char *format, size_t *transpose, int rank) {
   const char *json = NULL;
   if (!strcmp(format, "DVEC")) json = "{\"level_desc\":\"dense\",\"rank\":1,\"level\":{\"level_desc\":\"element\"}}";
   else if (!strcmp(format, "CVEC")) json = "{\"level_desc\":\"sparse\",\"rank\":1,\"level\":{\"level_desc\":\"element\"}}";
@@ -505,35 +580,39 @@ static cJSON *predefined_level(const char *format, size_t *transpose, int rank) 
   return cJSON_Parse(json);
 }
 
-static void usage(void) {
-  fprintf(stderr, "usage: reformat INPUT OUTPUT TARGET_HEADER.json [COMPRESSION]\n");
-  exit(2);
-}
-
-int main(int argc, char **argv) {
-  cJSON *source_header, *target_header, *format_json, *custom, *description;
+bsp_error_t bsp_reformat_file(const char *input, const char *output,
+                              cJSON *target_header, int compression) {
+  cJSON *source_header, *format_json, *custom, *description;
+  reformat_context_t context;
   const char *source_format, *target_format;
   bsp_tensor_t tensor = bsp_construct_default_tensor_t();
   bsp_matrix_t matrix;
   bsp_array_t source_values, values;
   entries_t entries;
   size_t *source_transpose, *target_transpose, *stored_dims, root_ptr[2];
-  int rank, compression = 0;
+  int rank;
   bool source_is_tensor, iso;
-  if (argc < 4 || argc > 5) usage();
-  if (argc == 5) compression = atoi(argv[4]);
-  if (compression < 0 || compression > 9) die("compression must be 0 through 9");
+  bsp_array_t fill_value;
+  bool owns_fill = false;
+  if (compression < 0 || compression > 9)
+    return BSP_ERROR_INVALID_INPUT;
 
-  source_header = input_header(argv[1]);
-  target_header = read_json(argv[3]);
+  source_header = input_header(input);
+  context.data_types =
+      cJSON_GetObjectItemCaseSensitive(target_header, "data_types");
   format_json = cJSON_GetObjectItemCaseSensitive(source_header, "format");
   source_format = cJSON_GetStringValue(format_json);
   target_format = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(target_header, "format"));
   if (source_format == NULL || target_format == NULL) die("header has no format string");
+  if (header_has_fill(source_header)) {
+    if (read_fill_value(input, &fill_value) != BSP_SUCCESS)
+      die("cannot read input fill_value");
+    owns_fill = true;
+  }
   source_is_tensor = strcmp(source_format, "custom") == 0;
 
   if (source_is_tensor) {
-    tensor = bsp_read_tensor(argv[1], NULL);
+    tensor = bsp_read_tensor(input, NULL);
     if (tensor.level == NULL) die("failed to parse input tensor");
     tensor.is_iso = header_values_are_iso(source_header);
     rank = tensor.rank;
@@ -541,7 +620,7 @@ int main(int argc, char **argv) {
     iso = tensor.is_iso;
     entries = tensor_to_coo(&tensor);
   } else {
-    if (bsp_read_matrix(&matrix, argv[1], NULL) != BSP_SUCCESS)
+    if (bsp_read_matrix(&matrix, input, NULL) != BSP_SUCCESS)
       die("failed to parse input matrix");
     rank = bsp_matrix_format_is_vector(matrix.format) ? 1 : 2;
     source_values = matrix.values;
@@ -549,9 +628,10 @@ int main(int argc, char **argv) {
     entries = matrix_to_coo(&matrix);
   }
 
-  source_transpose = malloc((size_t) rank * sizeof(*source_transpose));
-  target_transpose = malloc((size_t) rank * sizeof(*target_transpose));
-  stored_dims = malloc((size_t) rank * sizeof(*stored_dims));
+  size_t allocated_rank = rank ? (size_t) rank : 1;
+  source_transpose = malloc(allocated_rank * sizeof(*source_transpose));
+  target_transpose = malloc(allocated_rank * sizeof(*target_transpose));
+  stored_dims = malloc(allocated_rank * sizeof(*stored_dims));
   if (!source_transpose || !target_transpose || !stored_dims) die("out of memory");
   for (int d = 0; d < rank; ++d) {
     source_transpose[d] = source_is_tensor && tensor.transpose ? tensor.transpose[d] : (size_t) d;
@@ -592,29 +672,32 @@ int main(int argc, char **argv) {
   result.nnz = entries.size;
   result.is_iso = iso;
   result.structure = source_is_tensor ? tensor.structure : matrix.structure;
-  result.dims = malloc((size_t) rank * sizeof(*result.dims));
-  result.transpose = malloc((size_t) rank * sizeof(*result.transpose));
+  result.dims = malloc(allocated_rank * sizeof(*result.dims));
+  result.transpose = malloc(allocated_rank * sizeof(*result.transpose));
   if (!result.dims || !result.transpose) die("out of memory");
   for (int d = 0; d < rank; ++d) {
     result.dims[d] = source_is_tensor ? tensor.dims[d] : (d == 0 ? matrix.nrows : matrix.ncols);
     result.transpose[d] = target_transpose[d];
   }
   root_ptr[0] = 0; root_ptr[1] = entries.size;
-  result.level = build_level(description, &entries, stored_dims, 0, root_ptr, 1, true, values);
+  result.level = build_level(&context, description, &entries, stored_dims, 0,
+                             root_ptr, 1, true, values);
   if (!strcmp(target_format, "custom")) {
     cJSON *user = cJSON_CreateObject();
-    if (bsp_write_tensor(argv[2], result, NULL, user, compression) != BSP_SUCCESS)
+    if (bsp_write_tensor(output, result, NULL, user, compression) != BSP_SUCCESS)
       die("failed to write output tensor");
     cJSON_Delete(user);
-  } else if (write_predefined(argv[2], result, target_format, compression) !=
+  } else if (write_predefined(output, result, target_format, compression) !=
              BSP_SUCCESS) {
     die("failed to write predefined output");
   }
+  complete_output(output, target_header, owns_fill ? &fill_value : NULL);
 
   bsp_destroy_tensor_t(result);
   free_entries(&entries);
   if (source_is_tensor) bsp_destroy_tensor_t(tensor); else bsp_destroy_matrix_t(&matrix);
+  if (owns_fill) bsp_destroy_array_t(&fill_value);
   free(source_transpose); free(target_transpose); free(stored_dims);
-  cJSON_Delete(description); cJSON_Delete(source_header); cJSON_Delete(target_header);
-  return 0;
+  cJSON_Delete(description); cJSON_Delete(source_header);
+  return BSP_SUCCESS;
 }

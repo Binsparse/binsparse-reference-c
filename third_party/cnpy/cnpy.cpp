@@ -25,6 +25,7 @@ char cnpy::map_type(const std::type_info& t)
 
     if(t == typeid(int) ) return 'i';
     if(t == typeid(char) ) return 'i';
+    if(t == typeid(signed char) ) return 'i';
     if(t == typeid(short) ) return 'i';
     if(t == typeid(long) ) return 'i';
     if(t == typeid(long long) ) return 'i';
@@ -335,6 +336,5 @@ cnpy::NpyArray cnpy::npy_load(std::string fname) {
     fclose(fp);
     return arr;
 }
-
 
 

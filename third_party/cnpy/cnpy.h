@@ -240,10 +240,12 @@ namespace cnpy {
         dict += map_type(typeid(T));
         dict += std::to_string(sizeof(T));
         dict += "', 'fortran_order': False, 'shape': (";
-        dict += std::to_string(shape[0]);
-        for(size_t i = 1;i < shape.size();i++) {
-            dict += ", ";
-            dict += std::to_string(shape[i]);
+        if(!shape.empty()) {
+            dict += std::to_string(shape[0]);
+            for(size_t i = 1;i < shape.size();i++) {
+                dict += ", ";
+                dict += std::to_string(shape[i]);
+            }
         }
         if(shape.size() == 1) dict += ",";
         dict += "), }";
