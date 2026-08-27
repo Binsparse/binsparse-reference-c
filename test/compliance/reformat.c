@@ -91,10 +91,6 @@ cJSON *input_header(const char *path) {
   free(text);
   if (!cJSON_IsObject(outer)) die("invalid input Binsparse header");
   header = cJSON_DetachItemFromObjectCaseSensitive(outer, "binsparse");
-  if (header == NULL) {
-    header = outer;
-    outer = NULL;
-  }
   cJSON_Delete(outer);
   if (!cJSON_IsObject(header)) die("input has no binsparse header");
   return header;
@@ -141,8 +137,7 @@ void complete_output(const char *path, cJSON *requested,
   if (fill_value != NULL &&
       bsp_write_array(file, "fill_value", *fill_value, 0) != BSP_SUCCESS)
     die("cannot write fill_value");
-  /* Compliance containers store the Binsparse header directly. */
-  updated = cJSON_Print(header);
+  updated = cJSON_Print(outer);
   H5Adelete(file, "binsparse");
   if (updated == NULL ||
       bsp_write_attribute(file, "binsparse", updated) != BSP_SUCCESS)

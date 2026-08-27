@@ -68,11 +68,17 @@ bsp_tensor_t bsp_read_tensor_from_group(hid_t f) {
     dims[idx] = cJSON_GetNumberValue(cJSON_GetArrayItem(shape_, idx));
   }
   tensor.dims = dims;
-  assert(tensor.rank > 0);
 
   cJSON* data_types_ =
       cJSON_GetObjectItemCaseSensitive(binsparse, "data_types");
   assert(data_types_ != NULL);
+  const char* values_type = cJSON_GetStringValue(
+      cJSON_GetObjectItemCaseSensitive(data_types_, "values"));
+  assert(values_type != NULL);
+  if (strncmp(values_type, "iso[", 4) == 0) {
+    tensor.is_iso = true;
+    values_type += 4;
+  }
 
   cJSON* binsparse_custom =
       cJSON_GetObjectItemCaseSensitive(binsparse, "custom");
@@ -112,6 +118,16 @@ bsp_tensor_t bsp_read_tensor_from_group(hid_t f) {
       if (error != BSP_SUCCESS) {
         free(json_string);
         return tensor;
+      }
+      if (strncmp(values_type, "complex[", 8) == 0) {
+        error = bsp_fp_array_to_complex(&values);
+        if (error != BSP_SUCCESS) {
+          bsp_destroy_array_t(&values);
+          free(json_string);
+          return tensor;
+        }
+      } else if (strncmp(values_type, "bint8", 5) == 0) {
+        values.type = BSP_BINT8;
       }
       cur_level->kind = BSP_TENSOR_ELEMENT;
       bsp_element_t* data = malloc(sizeof(bsp_element_t));

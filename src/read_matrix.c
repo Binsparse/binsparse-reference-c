@@ -148,6 +148,8 @@ bsp_error_t bsp_read_matrix_from_group_parallel(bsp_matrix_t* matrix, hid_t f,
         // TODO: handle error
         return error;
       }
+    } else if (strncmp(type_string, "bint8", 5) == 0) {
+      matrix->values.type = BSP_BINT8;
     }
   }
 
@@ -308,6 +310,8 @@ bsp_error_t bsp_read_matrix_from_group_allocator(bsp_matrix_t* matrix, hid_t f,
         // TODO: handle error
         return error;
       }
+    } else if (strncmp(type_string, "bint8", 5) == 0) {
+      matrix->values.type = BSP_BINT8;
     }
   }
 

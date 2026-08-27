@@ -75,6 +75,8 @@ int main(int argc, char **argv) {
     if (fill_type != NULL && strncmp(fill_type, "complex[", 8) == 0 &&
         bsp_fp_array_to_complex(&fill_value) != BSP_SUCCESS)
       die("invalid complex fill_value");
+    if (fill_type != NULL && strncmp(fill_type, "bint8", 5) == 0)
+      fill_value.type = BSP_BINT8;
     owns_fill = true;
   } else {
     if (bsp_construct_array_t(&fill_value, 1, values.type) != BSP_SUCCESS)
