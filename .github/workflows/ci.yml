@@ -29,11 +29,13 @@ jobs:
     strategy:
       matrix:
         include:
-          - cc:  gcc-12
+          - id: gcc-12
+            cc:  gcc-12
             cxx: g++-12
-          - cc:  clang
+          - id: clang
+            cc:  clang
             cxx: clang++
-    name: ${{ matrix.cc }}
+    name: Build (${{ matrix.cc }})
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
@@ -46,13 +48,44 @@ jobs:
         cmake -B build
     - name: Build
       run: VERBOSE=true make -C build -j `nproc`
+    - name: Archive Build
+      run: tar -czf build.tar.gz build
+    - uses: actions/upload-artifact@v4
+      with:
+        name: compliance-build-${{ matrix.id }}
+        path: build.tar.gz
+        retention-days: 1
+
+  test:
+    name: Test (${{ matrix.cc }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - id: gcc-12
+            cc: gcc-12
+          - id: clang
+            cc: clang
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: compliance-build-${{ matrix.id }}
+    - name: Restore Build
+      run: tar -xzf build.tar.gz
+    - name: Install Runtime Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install libhdf5-dev
+    - uses: prefix-dev/setup-pixi@v0.10.0
+      with:
+        run-install: false
+        global-cache: true
     - name: Matrix Tests
       run: ctest --test-dir ./build/test/bash
-    - name: Install Julia
-      run: curl -fsSL https://install.julialang.org | sh -s -- -y
-    - name: Disable Julia precompilation
-      run: julia -e 'using Pkg; Pkg.add(["PrecompileTools", "Preferences"]); using PrecompileTools, Preferences; set_preferences!(PrecompileTools, "precompile_workloads" => false; force=true)'
-    - name: Install Julia Packages
-      run: julia -e 'using Pkg; Pkg.add(["Finch", "HDF5"])'
-    - name: Tensor Tests
-      run: ctest --test-dir ./build/test/julia
+    - name: Compliance Tests
+      env:
+        BINSPARSE_BUILD_DIR: ${{ github.workspace }}/build
+      run: ./test/compliance/run-binsparse-tests.sh -q

@@ -35,13 +35,6 @@ fi
   pixi install -e test
 )
 
-build_environment=(pixi exec -s cmake -s hdf5 -s zlib)
-"${build_environment[@]}" cmake -S "${repo_root}" -B "${build_dir}" \
-  -DCMAKE_BUILD_TYPE="${build_config}"
-"${build_environment[@]}" cmake --build "${build_dir}" \
-  --config "${build_config}" --parallel \
-  --target npy_to_binsparse binsparse_to_npy binsparse_to_binsparse
-
 executable_dir="${build_dir}/test/compliance"
 if [[ -d "${executable_dir}/${build_config}" ]]; then
   executable_dir="${executable_dir}/${build_config}"
