@@ -1,3 +1,9 @@
+#[[
+SPDX-FileCopyrightText: 2026 Binsparse Developers
+
+SPDX-License-Identifier: BSD-3-Clause
+]]
+
 find_package(ZLIB REQUIRED)
 
 add_library(cnpy_vendor STATIC

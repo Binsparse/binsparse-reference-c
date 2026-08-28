@@ -1,9 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Binsparse Developers
+ *
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
 #include "reformat.h"
 
 #include <stdio.h>
 
-int main(int argc, char **argv) {
-  cJSON *header;
+int main(int argc, char** argv) {
+  cJSON* header;
   bsp_error_t error;
 
   if (argc != 3) {

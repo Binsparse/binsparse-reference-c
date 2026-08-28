@@ -238,8 +238,8 @@ static inline bsp_error_t bsp_read_array_allocator(bsp_array_t* array, hid_t f,
   }
 
   hid_t native_type = bsp_get_hdf5_native_type(type);
-  herr_t status = H5Dread(dset, native_type, H5S_ALL, H5S_ALL, H5P_DEFAULT,
-                          array->data);
+  herr_t status =
+      H5Dread(dset, native_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, array->data);
   H5Tclose(hdf5_type);
 
   if (status < 0) {

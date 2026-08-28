@@ -82,7 +82,7 @@ jobs:
     - uses: prefix-dev/setup-pixi@v0.10.0
       with:
         run-install: false
-        global-cache: true
+        cache: false
     - name: Matrix Tests
       run: ctest --test-dir ./build/test/bash
     - name: Compliance Tests
