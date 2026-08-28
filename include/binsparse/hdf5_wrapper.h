@@ -42,19 +42,21 @@ static inline bsp_error_t bsp_write_array(hid_t f, const char* label,
 
   hid_t dcpl = H5Pcreate(H5P_DATASET_CREATE);
 
-  // Choose 1 MiB, the default chunk cache size, as our chunk size.
-  size_t chunk_size = 1024 * 1024 / bsp_type_size(array.type);
+  if (array.size > 0) {
+    // Choose 1 MiB, the default chunk cache size, as our chunk size.
+    size_t chunk_size = 1024 * 1024 / bsp_type_size(array.type);
 
-  // If the dataset is smaller than the chunk size, cap the chunk size.
-  if (array.size < chunk_size) {
-    chunk_size = array.size;
-  }
+    // If the dataset is smaller than the chunk size, cap the chunk size.
+    if (array.size < chunk_size) {
+      chunk_size = array.size;
+    }
 
-  hsize[0] = chunk_size;
-  H5Pset_chunk(dcpl, 1, hsize);
+    hsize[0] = chunk_size;
+    H5Pset_chunk(dcpl, 1, hsize);
 
-  if (compression_level > 0) {
-    H5Pset_deflate(dcpl, compression_level);
+    if (compression_level > 0) {
+      H5Pset_deflate(dcpl, compression_level);
+    }
   }
 
   hid_t dset =
@@ -67,17 +69,18 @@ static inline bsp_error_t bsp_write_array(hid_t f, const char* label,
     return BSP_ERROR_IO;
   }
 
-  hid_t hdf5_native_type = bsp_get_hdf5_native_type(array.type);
+  if (array.size > 0) {
+    hid_t hdf5_native_type = bsp_get_hdf5_native_type(array.type);
+    hid_t r = H5Dwrite(dset, hdf5_native_type, H5S_ALL, fspace, H5P_DEFAULT,
+                       array.data);
 
-  hid_t r = H5Dwrite(dset, hdf5_native_type, H5S_ALL, fspace, H5P_DEFAULT,
-                     array.data);
-
-  if (r < 0) {
-    H5Dclose(dset);
-    H5Sclose(fspace);
-    H5Pclose(lcpl);
-    H5Pclose(dcpl);
-    return BSP_ERROR_IO;
+    if (r < 0) {
+      H5Dclose(dset);
+      H5Sclose(fspace);
+      H5Pclose(lcpl);
+      H5Pclose(dcpl);
+      return BSP_ERROR_IO;
+    }
   }
 
   H5Sclose(fspace);

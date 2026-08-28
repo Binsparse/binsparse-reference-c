@@ -40,9 +40,9 @@ bsp_construct_array_t_allocator(bsp_array_t* array, size_t size,
   size_t byte_size = size * bsp_type_size(type);
 
   array->allocator = allocator;
-  array->data = array->allocator.malloc(byte_size);
+  array->data = byte_size == 0 ? NULL : array->allocator.malloc(byte_size);
 
-  if (array->data == NULL) {
+  if (byte_size != 0 && array->data == NULL) {
     return BSP_ERROR_MEMORY;
   }
 
@@ -65,7 +65,8 @@ static inline bsp_error_t bsp_copy_construct_array_t(bsp_array_t* array,
     return error;
   }
 
-  memcpy(array->data, other.data, other.size * bsp_type_size(other.type));
+  if (other.size != 0)
+    memcpy(array->data, other.data, other.size * bsp_type_size(other.type));
 
   return BSP_SUCCESS;
 }

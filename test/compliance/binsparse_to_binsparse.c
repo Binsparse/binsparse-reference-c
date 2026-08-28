@@ -7,6 +7,7 @@
 #include "reformat.h"
 
 #include <stdio.h>
+#include <string.h>
 
 int main(int argc, char** argv) {
   cJSON* header;
@@ -17,6 +18,12 @@ int main(int argc, char** argv) {
     return 2;
   }
   header = input_header(argv[1]);
+  cJSON* format = cJSON_GetObjectItemCaseSensitive(header, "format");
+  const char* name = cJSON_GetStringValue(format);
+  if (name != NULL && strcmp(name, "DMAT") == 0)
+    cJSON_SetValuestring(format, "DMATR");
+  else if (name != NULL && strcmp(name, "COO") == 0)
+    cJSON_SetValuestring(format, "COOR");
   error = bsp_reformat_file(argv[1], argv[2], header, 0);
   cJSON_Delete(header);
   if (error != BSP_SUCCESS) {
