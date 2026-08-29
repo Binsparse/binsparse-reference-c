@@ -114,6 +114,21 @@ bool header_has_fill(cJSON* header) {
   return cJSON_IsTrue(cJSON_GetObjectItemCaseSensitive(header, "fill"));
 }
 
+void canonicalize_predefined_alias(cJSON* header) {
+  cJSON* item = cJSON_GetObjectItemCaseSensitive(header, "format");
+  const char* format = cJSON_GetStringValue(item);
+  const char* canonical = NULL;
+  if (format == NULL)
+    return;
+  if (!strcmp(format, "DMAT"))
+    canonical = "DMATR";
+  else if (!strcmp(format, "COO"))
+    canonical = "COOR";
+  if (canonical != NULL)
+    cJSON_ReplaceItemInObjectCaseSensitive(header, "format",
+                                           cJSON_CreateString(canonical));
+}
+
 static bsp_error_t read_fill_value(const char* path, bsp_array_t* value) {
   hid_t file = H5Fopen(path, H5F_ACC_RDONLY, H5P_DEFAULT);
   bsp_error_t error;

@@ -37,6 +37,7 @@ cJSON* read_json(const char* path);
 cJSON* input_header(const char* path);
 bool header_values_are_iso(cJSON* header);
 bool header_has_fill(cJSON* header);
+void canonicalize_predefined_alias(cJSON* header);
 void complete_output(const char* path, cJSON* requested,
                      const bsp_array_t* fill_value);
 

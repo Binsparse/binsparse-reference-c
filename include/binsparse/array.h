@@ -105,7 +105,9 @@ static inline bsp_error_t bsp_fp_array_to_complex(bsp_array_t* array) {
 }
 
 static inline void bsp_destroy_array_t(bsp_array_t* array) {
-  array->allocator.free(array->data);
+  if (array->data != NULL) {
+    array->allocator.free(array->data);
+  }
 }
 
 static inline bool bsp_array_equal(bsp_array_t x, bsp_array_t y) {

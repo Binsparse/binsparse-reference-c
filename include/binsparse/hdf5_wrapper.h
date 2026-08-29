@@ -126,6 +126,16 @@ static inline bsp_error_t bsp_read_array_parallel(bsp_array_t* array, hid_t f,
   hid_t hdf5_type = H5Dget_type(dset);
 
   bsp_type_t type = bsp_get_bsp_type(hdf5_type);
+  if (dims[0] == 0) {
+    array->type = type;
+    array->size = 0;
+    array->data = NULL;
+    array->allocator = bsp_shm_allocator;
+    H5Tclose(hdf5_type);
+    H5Sclose(fspace);
+    H5Dclose(dset);
+    return BSP_SUCCESS;
+  }
 
   // Array will be written into a POSIX shared memory.
   bsp_shm_t array_shm = bsp_shm_new(dims[0] * bsp_type_size(type));
@@ -238,6 +248,13 @@ static inline bsp_error_t bsp_read_array_allocator(bsp_array_t* array, hid_t f,
     H5Sclose(fspace);
     bsp_construct_default_array_t_allocator(array, allocator);
     return BSP_ERROR_MEMORY;
+  }
+
+  if (array->size == 0) {
+    H5Tclose(hdf5_type);
+    H5Sclose(fspace);
+    H5Dclose(dset);
+    return BSP_SUCCESS;
   }
 
   hid_t native_type = bsp_get_hdf5_native_type(type);
