@@ -142,6 +142,8 @@ static inline bsp_error_t bsp_read_array_parallel(bsp_array_t* array, hid_t f,
   array->type = type;
   array->size = dims[0];
   array->allocator = bsp_shm_allocator;
+  array->data = bsp_shm_attach(array_shm);
+  bsp_shm_delete(array_shm);
 
   bsp_shm_t active_children_shm = bsp_shm_new(sizeof(_Atomic int));
 
@@ -163,11 +165,6 @@ static inline bsp_error_t bsp_read_array_parallel(bsp_array_t* array, hid_t f,
       thread_num = i + 1;
       break;
     }
-  }
-
-  array->data = bsp_shm_attach(array_shm);
-  if (thread_num == 0) {
-    bsp_shm_delete(array_shm);
   }
 
   hsize_t chunk_size = (array->size + num_threads - 1) / num_threads;

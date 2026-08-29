@@ -48,12 +48,24 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cJSON)
 
+# cpp-semver is header-only. Use strict SemVer parsing for file-format metadata.
+set(SEMVER_BUILD_TESTS OFF CACHE INTERNAL "Disable cpp-semver tests")
+set(SEMVER_INSTALL OFF CACHE INTERNAL "Disable cpp-semver install")
+FetchContent_Declare(
+  cpp-semver
+  GIT_REPOSITORY https://github.com/z4kn4fein/cpp-semver.git
+  GIT_TAG v0.4.0
+)
+FetchContent_MakeAvailable(cpp-semver)
+
 # Restore original BUILD_SHARED_LIBS setting
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_BACKUP})
 
 configure_file(${cJSON_SOURCE_DIR}/cJSON.h ${CMAKE_BINARY_DIR}/include/cJSON/cJSON.h)
 target_link_libraries(binsparse PRIVATE cjson)
 target_link_libraries(binsparse_dynamic PRIVATE cjson)
+target_link_libraries(binsparse PRIVATE $<BUILD_INTERFACE:semver>)
+target_link_libraries(binsparse_dynamic PRIVATE $<BUILD_INTERFACE:semver>)
 
 # Set up include directories properly for both build and install
 target_include_directories(${PROJECT_NAME}

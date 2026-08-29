@@ -9,6 +9,7 @@
 #include <binsparse/matrix.h>
 #include <binsparse/matrix_market/matrix_market_read.h>
 #include <binsparse/tensor.h>
+#include <binsparse/version.h>
 #include <cJSON/cJSON.h>
 #include <math.h>
 #include <string.h>
@@ -51,6 +52,13 @@ bsp_tensor_t bsp_read_tensor_from_group(hid_t f) {
   assert(version_ != NULL);
 
   assert(cJSON_IsString(version_));
+
+  error = bsp_check_version_compatible(cJSON_GetStringValue(version_));
+  if (error != BSP_SUCCESS) {
+    cJSON_Delete(j);
+    free(json_string);
+    return tensor;
+  }
 
   // nnz computation
   cJSON* nnz_ =
