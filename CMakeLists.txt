@@ -3,17 +3,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 cmake_minimum_required(VERSION 3.20)
-project(binsparse VERSION 1.0.0)
+project(binsparse VERSION 1.0.0 LANGUAGES C)
 
 cmake_policy(SET CMP0079 NEW)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 20)
 
 # FIXME: -march=native is not portable
 # set(CMAKE_C_FLAGS "-O3 -march=native")
 set(CMAKE_C_FLAGS "-g ")
-set(CMAKE_CXX_FLAGS "-g ")
 
 option(ENABLE_SANITIZERS "Enable Clang sanitizers" OFF)
 
@@ -48,15 +46,21 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cJSON)
 
-# cpp-semver is header-only. Use strict SemVer parsing for file-format metadata.
-set(SEMVER_BUILD_TESTS OFF CACHE INTERNAL "Disable cpp-semver tests")
-set(SEMVER_INSTALL OFF CACHE INTERNAL "Disable cpp-semver install")
 FetchContent_Declare(
-  cpp-semver
-  GIT_REPOSITORY https://github.com/z4kn4fein/cpp-semver.git
-  GIT_TAG v0.4.0
+  semver_c
+  GIT_REPOSITORY https://github.com/h2non/semver.c.git
+  GIT_TAG v1.0.0
 )
-FetchContent_MakeAvailable(cpp-semver)
+FetchContent_MakeAvailable(semver_c)
+add_library(binsparse_semver OBJECT ${semver_c_SOURCE_DIR}/semver.c)
+set_target_properties(binsparse_semver PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+target_include_directories(binsparse_semver PRIVATE
+    $<BUILD_INTERFACE:${semver_c_SOURCE_DIR}>)
+target_sources(binsparse PRIVATE $<TARGET_OBJECTS:binsparse_semver>)
+target_sources(binsparse_dynamic PRIVATE $<TARGET_OBJECTS:binsparse_semver>)
+target_include_directories(binsparse PRIVATE ${semver_c_SOURCE_DIR})
+target_include_directories(binsparse_dynamic PRIVATE ${semver_c_SOURCE_DIR})
 
 # Restore original BUILD_SHARED_LIBS setting
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_BACKUP})
@@ -64,8 +68,6 @@ set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_BACKUP})
 configure_file(${cJSON_SOURCE_DIR}/cJSON.h ${CMAKE_BINARY_DIR}/include/cJSON/cJSON.h)
 target_link_libraries(binsparse PRIVATE cjson)
 target_link_libraries(binsparse_dynamic PRIVATE cjson)
-target_link_libraries(binsparse PRIVATE $<BUILD_INTERFACE:semver>)
-target_link_libraries(binsparse_dynamic PRIVATE $<BUILD_INTERFACE:semver>)
 
 # Set up include directories properly for both build and install
 target_include_directories(${PROJECT_NAME}

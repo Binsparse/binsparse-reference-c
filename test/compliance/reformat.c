@@ -14,6 +14,7 @@
 
 #include "reformat.h"
 
+#include <binsparse/binsparse_cJSON.h>
 #include <binsparse/hdf5_wrapper.h>
 #include <binsparse/matrix_formats.h>
 #include <binsparse/read_matrix.h>
@@ -783,7 +784,7 @@ bsp_error_t bsp_reformat_file(const char* input, const char* output,
                              root_ptr, 1, true, values);
   if (!strcmp(target_format, "custom")) {
     cJSON* user = cJSON_CreateObject();
-    if (bsp_write_tensor(output, result, NULL, user, compression) !=
+    if (bsp_write_tensor_cjson(output, result, NULL, user, compression) !=
         BSP_SUCCESS)
       die("failed to write output tensor");
     cJSON_Delete(user);

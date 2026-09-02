@@ -5,8 +5,10 @@
  */
 
 #include <binsparse/binsparse.h>
+#include <binsparse/binsparse_cJSON.h>
 #include <binsparse/hdf5_wrapper.h>
 #include <binsparse/read_tensor.h>
+#include <binsparse/write_tensor.h>
 
 #include <assert.h>
 #include <unistd.h>
@@ -27,10 +29,12 @@ static cJSON* init_tensor_json(bsp_tensor_t tensor, cJSON* user_json) {
   cJSON_AddItemToObject(binsparse, "custom", binsparse_custom);
   cJSON_AddItemToObject(j, "binsparse", binsparse);
 
-  cJSON* userJsonItem;
-
-  cJSON_ArrayForEach(userJsonItem, user_json) {
-    cJSON_AddItemToObject(j, userJsonItem->string, userJsonItem);
+  if (user_json != NULL) {
+    cJSON* user_json_item;
+    cJSON_ArrayForEach(user_json_item, user_json) {
+      cJSON* item_copy = cJSON_Duplicate(user_json_item, 1);
+      cJSON_AddItemToObject(j, user_json_item->string, item_copy);
+    }
   }
 
   cJSON_AddStringToObject(binsparse, "version", BINSPARSE_VERSION);
@@ -55,8 +59,9 @@ static cJSON* init_tensor_json(bsp_tensor_t tensor, cJSON* user_json) {
   return j;
 }
 
-bsp_error_t bsp_write_tensor_to_group(hid_t f, bsp_tensor_t tensor,
-                                      cJSON* user_json, int compression_level) {
+bsp_error_t bsp_write_tensor_to_group_cjson(hid_t f, bsp_tensor_t tensor,
+                                            cJSON* user_json,
+                                            int compression_level) {
   // bsp_matrix_t matrix;
   cJSON* j = init_tensor_json(tensor, user_json);
   // tensor:
@@ -167,13 +172,29 @@ bsp_error_t bsp_write_tensor_to_group(hid_t f, bsp_tensor_t tensor,
   return BSP_SUCCESS;
 }
 
-bsp_error_t bsp_write_tensor(const char* fname, bsp_tensor_t tensor,
-                             const char* group, cJSON* user_json,
-                             int compression_level) {
+bsp_error_t bsp_write_tensor_to_group(hid_t f, bsp_tensor_t tensor,
+                                      const char* user_json,
+                                      int compression_level) {
+  cJSON* user_json_cjson = NULL;
+  if (user_json != NULL) {
+    user_json_cjson = cJSON_Parse(user_json);
+  }
+  if (user_json_cjson == NULL) {
+    user_json_cjson = cJSON_CreateObject();
+  }
+  bsp_error_t error = bsp_write_tensor_to_group_cjson(
+      f, tensor, user_json_cjson, compression_level);
+  cJSON_Delete(user_json_cjson);
+  return error;
+}
+
+bsp_error_t bsp_write_tensor_cjson(const char* fname, bsp_tensor_t tensor,
+                                   const char* group, cJSON* user_json,
+                                   int compression_level) {
   if (group == NULL) {
     hid_t f = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     bsp_error_t error =
-        bsp_write_tensor_to_group(f, tensor, user_json, compression_level);
+        bsp_write_tensor_to_group_cjson(f, tensor, user_json, compression_level);
     if (error != BSP_SUCCESS) {
       H5Fclose(f);
       return error;
@@ -187,9 +208,32 @@ bsp_error_t bsp_write_tensor(const char* fname, bsp_tensor_t tensor,
       f = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     }
     hid_t g = H5Gcreate1(f, group, H5P_DEFAULT);
-    bsp_write_tensor_to_group(g, tensor, user_json, compression_level);
+    bsp_error_t error =
+        bsp_write_tensor_to_group_cjson(g, tensor, user_json, compression_level);
+    if (error != BSP_SUCCESS) {
+      H5Gclose(g);
+      H5Fclose(f);
+      return error;
+    }
     H5Gclose(g);
     H5Fclose(f);
   }
   return BSP_SUCCESS;
+}
+
+bsp_error_t bsp_write_tensor(const char* fname, bsp_tensor_t tensor,
+                             const char* group, const char* user_json,
+                             int compression_level) {
+  cJSON* user_json_cjson = NULL;
+  if (user_json != NULL) {
+    user_json_cjson = cJSON_Parse(user_json);
+  }
+  if (user_json_cjson == NULL) {
+    user_json_cjson = cJSON_CreateObject();
+  }
+
+  bsp_error_t error = bsp_write_tensor_cjson(
+      fname, tensor, group, user_json_cjson, compression_level);
+  cJSON_Delete(user_json_cjson);
+  return error;
 }

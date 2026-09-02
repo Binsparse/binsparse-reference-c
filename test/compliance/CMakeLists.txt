@@ -5,6 +5,7 @@ SPDX-License-Identifier: BSD-3-Clause
 ]]
 
 find_package(ZLIB REQUIRED)
+enable_language(CXX)
 
 add_library(cnpy_vendor STATIC
   ${PROJECT_SOURCE_DIR}/third_party/cnpy/cnpy.cpp

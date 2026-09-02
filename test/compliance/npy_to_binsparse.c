@@ -7,6 +7,8 @@
 #include "cnpy_c.h"
 #include "reformat.h"
 
+#include <binsparse/binsparse_cJSON.h>
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -158,7 +160,7 @@ int main(int argc, char** argv) {
                              root_ptr, 1, true, values);
   if (!strcmp(format, "custom")) {
     cJSON* user = cJSON_CreateObject();
-    if (bsp_write_tensor(argv[5], result, NULL, user, 0) != BSP_SUCCESS)
+    if (bsp_write_tensor_cjson(argv[5], result, NULL, user, 0) != BSP_SUCCESS)
       die("cannot write Binsparse tensor");
     cJSON_Delete(user);
   } else if (write_predefined(argv[5], result, format, 0) != BSP_SUCCESS) {

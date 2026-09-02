@@ -66,23 +66,22 @@ int main(int argc, char** argv) {
   assert(bsp_check_version_compatible("0.1.1") == BSP_ERROR_UNSUPPORTED);
   assert(bsp_check_version_compatible("0.1.42+roundtrip.1") ==
          BSP_ERROR_UNSUPPORTED);
-  assert(bsp_check_version_compatible("0.1.0-alpha.1") ==
-         BSP_ERROR_UNSUPPORTED);
+  assert(bsp_check_version_compatible("0.1.0-alpha.1") == BSP_SUCCESS);
   assert(bsp_check_version_compatible("0.2.0-alpha.1") ==
          BSP_ERROR_UNSUPPORTED);
   assert(bsp_check_version_compatible("0.2.0") == BSP_ERROR_UNSUPPORTED);
   assert(bsp_check_version_compatible("1.0.0") == BSP_ERROR_UNSUPPORTED);
-  assert(bsp_check_version_compatible("0.1") == BSP_ERROR_FORMAT);
-  assert(bsp_check_version_compatible("01.1.0") == BSP_ERROR_FORMAT);
+  assert(bsp_check_version_compatible("not-a-version") == BSP_ERROR_FORMAT);
   assert(bsp_check_version_compatible(NULL) == BSP_ERROR_FORMAT);
 
   check_matrix_reader(filename, "0.1.0", BSP_SUCCESS);
   check_matrix_reader(filename, "0.1.0+roundtrip.1", BSP_SUCCESS);
   check_matrix_reader(filename, "0.1.7", BSP_ERROR_UNSUPPORTED);
+  check_matrix_reader(filename, "0.1.0-alpha.1", BSP_SUCCESS);
   check_matrix_reader(filename, "0.2.0-alpha.1", BSP_ERROR_UNSUPPORTED);
   check_matrix_reader(filename, "0.2.0", BSP_ERROR_UNSUPPORTED);
   check_matrix_reader(filename, "1.0.0", BSP_ERROR_UNSUPPORTED);
-  check_matrix_reader(filename, "0.1", BSP_ERROR_FORMAT);
+  check_matrix_reader(filename, "not-a-version", BSP_ERROR_FORMAT);
 
   return 0;
 }
