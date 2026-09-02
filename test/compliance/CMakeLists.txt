@@ -6,13 +6,22 @@ SPDX-License-Identifier: BSD-3-Clause
 
 find_package(ZLIB REQUIRED)
 enable_language(CXX)
+include(FetchContent)
+
+FetchContent_Declare(
+  cnpy
+  GIT_REPOSITORY https://github.com/rogersce/cnpy.git
+  GIT_TAG 4e8810b1a8637695171ed346ce68f6984e585ef4
+  SOURCE_SUBDIR cmake
+)
+FetchContent_MakeAvailable(cnpy)
 
 add_library(cnpy_vendor STATIC
-  ${PROJECT_SOURCE_DIR}/third_party/cnpy/cnpy.cpp
+  ${cnpy_SOURCE_DIR}/cnpy.cpp
   cnpy_c.cpp
 )
 target_include_directories(cnpy_vendor PUBLIC
-  ${PROJECT_SOURCE_DIR}/third_party/cnpy
+  ${cnpy_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 target_link_libraries(cnpy_vendor PUBLIC ZLIB::ZLIB)
