@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include "cnpy_c.h"
+#include "npy_c.h"
 #include "reformat.h"
 
 #include <binsparse/hdf5_wrapper.h>
@@ -121,9 +121,9 @@ int main(int argc, char** argv) {
                entries.entry[k].value * bsp_type_size(values.type),
            bsp_type_size(values.type));
   }
-  if (cnpy_c_save(argv[2], dense, shape, (size_t) rank, values.type) ||
-      cnpy_c_save(argv[3], pattern, shape, (size_t) rank, BSP_BINT8) ||
-      cnpy_c_save(argv[4], fill_value.data, NULL, 0, fill_value.type))
+  if (npy_c_save(argv[2], dense, shape, (size_t) rank, values.type) ||
+      npy_c_save(argv[3], pattern, shape, (size_t) rank, BSP_BINT8) ||
+      npy_c_save(argv[4], fill_value.data, NULL, 0, fill_value.type))
     die("cannot write NPY output");
 
   free(dense);

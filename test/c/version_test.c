@@ -28,12 +28,12 @@ static void write_versioned_dvec(const char* filename, const char* version) {
   bsp_destroy_matrix_t(&matrix);
 
   char json[1024];
-  int length = snprintf(
-      json, sizeof(json),
-      "{\"binsparse\":{\"version\":\"%s\",\"format\":\"DVEC\","
-      "\"shape\":[2],\"number_of_stored_values\":2,"
-      "\"data_types\":{\"values\":\"float64\"}}}",
-      version);
+  int length =
+      snprintf(json, sizeof(json),
+               "{\"binsparse\":{\"version\":\"%s\",\"format\":\"DVEC\","
+               "\"shape\":[2],\"number_of_stored_values\":2,"
+               "\"data_types\":{\"values\":\"float64\"}}}",
+               version);
   assert(length > 0 && (size_t) length < sizeof(json));
 
   hid_t file = H5Fopen(filename, H5F_ACC_RDWR, H5P_DEFAULT);
@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
   assert(argc == 2);
   const char* filename = argv[1];
 
+  assert(bsp_check_version_compatible("0.1") == BSP_SUCCESS);
   assert(bsp_check_version_compatible("0.1.0") == BSP_SUCCESS);
   assert(bsp_check_version_compatible("0.1.0+roundtrip.1") == BSP_SUCCESS);
   assert(bsp_check_version_compatible("0.1.1") == BSP_ERROR_UNSUPPORTED);
@@ -75,6 +76,7 @@ int main(int argc, char** argv) {
   assert(bsp_check_version_compatible(NULL) == BSP_ERROR_FORMAT);
 
   check_matrix_reader(filename, "0.1.0", BSP_SUCCESS);
+  check_matrix_reader(filename, "0.1", BSP_SUCCESS);
   check_matrix_reader(filename, "0.1.0+roundtrip.1", BSP_SUCCESS);
   check_matrix_reader(filename, "0.1.7", BSP_ERROR_UNSUPPORTED);
   check_matrix_reader(filename, "0.1.0-alpha.1", BSP_SUCCESS);

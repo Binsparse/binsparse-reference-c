@@ -9,7 +9,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 build_dir="${BINSPARSE_BUILD_DIR:-${repo_root}/build-compliance}"
 tests_dir="${BINSPARSE_TESTS_DIR:-${build_dir}/binsparse-tests}"
-tests_ref="${BINSPARSE_TESTS_REF:-main}"
+tests_ref="${BINSPARSE_TESTS_REF:-9df16f6e7fe6d73c147ea5a3c23cf203876386b6}"
 build_config="${BINSPARSE_BUILD_CONFIG:-Release}"
 
 for command in git pixi; do

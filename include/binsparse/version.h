@@ -8,7 +8,7 @@
 
 #include <binsparse/error.h>
 
-#define BINSPARSE_VERSION "0.1.0"
+#define BINSPARSE_VERSION "0.1"
 
 #ifdef __cplusplus
 extern "C" {

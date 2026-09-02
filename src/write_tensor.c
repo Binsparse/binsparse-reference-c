@@ -193,8 +193,8 @@ bsp_error_t bsp_write_tensor_cjson(const char* fname, bsp_tensor_t tensor,
                                    int compression_level) {
   if (group == NULL) {
     hid_t f = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
-    bsp_error_t error =
-        bsp_write_tensor_to_group_cjson(f, tensor, user_json, compression_level);
+    bsp_error_t error = bsp_write_tensor_to_group_cjson(f, tensor, user_json,
+                                                        compression_level);
     if (error != BSP_SUCCESS) {
       H5Fclose(f);
       return error;
@@ -208,8 +208,8 @@ bsp_error_t bsp_write_tensor_cjson(const char* fname, bsp_tensor_t tensor,
       f = H5Fcreate(fname, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);
     }
     hid_t g = H5Gcreate1(f, group, H5P_DEFAULT);
-    bsp_error_t error =
-        bsp_write_tensor_to_group_cjson(g, tensor, user_json, compression_level);
+    bsp_error_t error = bsp_write_tensor_to_group_cjson(g, tensor, user_json,
+                                                        compression_level);
     if (error != BSP_SUCCESS) {
       H5Gclose(g);
       H5Fclose(f);

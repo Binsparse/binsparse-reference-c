@@ -19,12 +19,12 @@ typedef struct {
   size_t rank;
   size_t* shape;
   size_t* strides;
-} cnpy_c_array;
+} npy_c_array;
 
-int cnpy_c_load(const char* path, cnpy_c_array* array);
-void cnpy_c_destroy(cnpy_c_array* array);
-int cnpy_c_save(const char* path, const void* data, const size_t* shape,
-                size_t rank, int bsp_type);
+int npy_c_load(const char* path, npy_c_array* array);
+void npy_c_destroy(npy_c_array* array);
+int npy_c_save(const char* path, const void* data, const size_t* shape,
+               size_t rank, int bsp_type);
 
 #ifdef __cplusplus
 }
