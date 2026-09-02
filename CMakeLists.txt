@@ -3,17 +3,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 cmake_minimum_required(VERSION 3.20)
-project(binsparse VERSION 1.0.0)
+project(binsparse VERSION 1.0.0 LANGUAGES C)
 
 cmake_policy(SET CMP0079 NEW)
 
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 20)
 
 # FIXME: -march=native is not portable
 # set(CMAKE_C_FLAGS "-O3 -march=native")
 set(CMAKE_C_FLAGS "-g ")
-set(CMAKE_CXX_FLAGS "-g ")
 
 option(ENABLE_SANITIZERS "Enable Clang sanitizers" OFF)
 
@@ -47,6 +45,22 @@ FetchContent_Declare(
   GIT_TAG 887642c0a93bd8a6616bf90daacac0ea7d4b095e
 )
 FetchContent_MakeAvailable(cJSON)
+
+FetchContent_Declare(
+  semver_c
+  GIT_REPOSITORY https://github.com/h2non/semver.c.git
+  GIT_TAG v1.0.0
+)
+FetchContent_MakeAvailable(semver_c)
+add_library(binsparse_semver OBJECT ${semver_c_SOURCE_DIR}/semver.c)
+set_target_properties(binsparse_semver PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+target_include_directories(binsparse_semver PRIVATE
+    $<BUILD_INTERFACE:${semver_c_SOURCE_DIR}>)
+target_sources(binsparse PRIVATE $<TARGET_OBJECTS:binsparse_semver>)
+target_sources(binsparse_dynamic PRIVATE $<TARGET_OBJECTS:binsparse_semver>)
+target_include_directories(binsparse PRIVATE ${semver_c_SOURCE_DIR})
+target_include_directories(binsparse_dynamic PRIVATE ${semver_c_SOURCE_DIR})
 
 # Restore original BUILD_SHARED_LIBS setting
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_BACKUP})
@@ -121,6 +135,8 @@ install(FILES
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   enable_testing()
+
+  add_subdirectory(test/compliance)
 
   if (ENABLE_SANITIZERS)
       set(SANITIZER_FLAGS "-fsanitize=address,undefined")

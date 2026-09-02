@@ -6,8 +6,6 @@
 
 #pragma once
 
-#define BINSPARSE_VERSION "0.1"
-
 #include <binsparse/array.h>
 #include <binsparse/convert_matrix.h>
 #include <binsparse/detail/detail.h>
@@ -19,4 +17,5 @@
 #include <binsparse/matrix_market/matrix_market_write.h>
 #include <binsparse/minimize_values.h>
 #include <binsparse/read_matrix.h>
+#include <binsparse/version.h>
 #include <binsparse/write_matrix.h>

@@ -11,6 +11,7 @@
 #include <binsparse/hdf5_wrapper.h>
 #include <binsparse/matrix.h>
 #include <binsparse/matrix_market/matrix_market_read.h>
+#include <binsparse/version.h>
 #include <cJSON/cJSON.h>
 #include <math.h>
 #include <unistd.h>
@@ -91,7 +92,12 @@ bsp_error_t bsp_read_matrix_from_group_parallel(bsp_matrix_t* matrix, hid_t f,
 
   assert(cJSON_IsString(version_));
 
-  // TODO: check version.
+  error = bsp_check_version_compatible(cJSON_GetStringValue(version_));
+  if (error != BSP_SUCCESS) {
+    cJSON_Delete(j);
+    free(json_string);
+    return error;
+  }
 
   cJSON* format_ = cJSON_GetObjectItemCaseSensitive(binsparse, "format");
   assert(format_ != NULL);
@@ -148,6 +154,8 @@ bsp_error_t bsp_read_matrix_from_group_parallel(bsp_matrix_t* matrix, hid_t f,
         // TODO: handle error
         return error;
       }
+    } else if (strncmp(type_string, "bint8", 5) == 0) {
+      matrix->values.type = BSP_BINT8;
     }
   }
 
@@ -235,7 +243,12 @@ bsp_error_t bsp_read_matrix_from_group_allocator(bsp_matrix_t* matrix, hid_t f,
     return BSP_ERROR_FORMAT;
   }
 
-  // TODO: check version.
+  error = bsp_check_version_compatible(cJSON_GetStringValue(version_));
+  if (error != BSP_SUCCESS) {
+    cJSON_Delete(j);
+    allocator.free(json_string);
+    return error;
+  }
 
   cJSON* format_ = cJSON_GetObjectItemCaseSensitive(binsparse, "format");
   if (format_ == NULL || !cJSON_IsString(format_)) {
@@ -308,6 +321,8 @@ bsp_error_t bsp_read_matrix_from_group_allocator(bsp_matrix_t* matrix, hid_t f,
         // TODO: handle error
         return error;
       }
+    } else if (strncmp(type_string, "bint8", 5) == 0) {
+      matrix->values.type = BSP_BINT8;
     }
   }
 

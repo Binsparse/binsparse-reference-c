@@ -20,5 +20,3 @@ add_example(benchmark_read)
 add_example(benchmark_read_parallel)
 add_example(benchmark_write)
 add_example(tensor_test)
-
-add_subdirectory(cpp)

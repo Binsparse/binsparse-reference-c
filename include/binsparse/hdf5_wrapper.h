@@ -42,19 +42,21 @@ static inline bsp_error_t bsp_write_array(hid_t f, const char* label,
 
   hid_t dcpl = H5Pcreate(H5P_DATASET_CREATE);
 
-  // Choose 1 MiB, the default chunk cache size, as our chunk size.
-  size_t chunk_size = 1024 * 1024 / bsp_type_size(array.type);
+  if (array.size > 0) {
+    // Choose 1 MiB, the default chunk cache size, as our chunk size.
+    size_t chunk_size = 1024 * 1024 / bsp_type_size(array.type);
 
-  // If the dataset is smaller than the chunk size, cap the chunk size.
-  if (array.size < chunk_size) {
-    chunk_size = array.size;
-  }
+    // If the dataset is smaller than the chunk size, cap the chunk size.
+    if (array.size < chunk_size) {
+      chunk_size = array.size;
+    }
 
-  hsize[0] = chunk_size;
-  H5Pset_chunk(dcpl, 1, hsize);
+    hsize[0] = chunk_size;
+    H5Pset_chunk(dcpl, 1, hsize);
 
-  if (compression_level > 0) {
-    H5Pset_deflate(dcpl, compression_level);
+    if (compression_level > 0) {
+      H5Pset_deflate(dcpl, compression_level);
+    }
   }
 
   hid_t dset =
@@ -67,17 +69,18 @@ static inline bsp_error_t bsp_write_array(hid_t f, const char* label,
     return BSP_ERROR_IO;
   }
 
-  hid_t hdf5_native_type = bsp_get_hdf5_native_type(array.type);
+  if (array.size > 0) {
+    hid_t hdf5_native_type = bsp_get_hdf5_native_type(array.type);
+    hid_t r = H5Dwrite(dset, hdf5_native_type, H5S_ALL, fspace, H5P_DEFAULT,
+                       array.data);
 
-  hid_t r = H5Dwrite(dset, hdf5_native_type, H5S_ALL, fspace, H5P_DEFAULT,
-                     array.data);
-
-  if (r < 0) {
-    H5Dclose(dset);
-    H5Sclose(fspace);
-    H5Pclose(lcpl);
-    H5Pclose(dcpl);
-    return BSP_ERROR_IO;
+    if (r < 0) {
+      H5Dclose(dset);
+      H5Sclose(fspace);
+      H5Pclose(lcpl);
+      H5Pclose(dcpl);
+      return BSP_ERROR_IO;
+    }
   }
 
   H5Sclose(fspace);
@@ -123,12 +126,24 @@ static inline bsp_error_t bsp_read_array_parallel(bsp_array_t* array, hid_t f,
   hid_t hdf5_type = H5Dget_type(dset);
 
   bsp_type_t type = bsp_get_bsp_type(hdf5_type);
+  if (dims[0] == 0) {
+    array->type = type;
+    array->size = 0;
+    array->data = NULL;
+    array->allocator = bsp_shm_allocator;
+    H5Tclose(hdf5_type);
+    H5Sclose(fspace);
+    H5Dclose(dset);
+    return BSP_SUCCESS;
+  }
 
   // Array will be written into a POSIX shared memory.
   bsp_shm_t array_shm = bsp_shm_new(dims[0] * bsp_type_size(type));
   array->type = type;
   array->size = dims[0];
   array->allocator = bsp_shm_allocator;
+  array->data = bsp_shm_attach(array_shm);
+  bsp_shm_delete(array_shm);
 
   bsp_shm_t active_children_shm = bsp_shm_new(sizeof(_Atomic int));
 
@@ -150,11 +165,6 @@ static inline bsp_error_t bsp_read_array_parallel(bsp_array_t* array, hid_t f,
       thread_num = i + 1;
       break;
     }
-  }
-
-  array->data = bsp_shm_attach(array_shm);
-  if (thread_num == 0) {
-    bsp_shm_delete(array_shm);
   }
 
   hsize_t chunk_size = (array->size + num_threads - 1) / num_threads;
@@ -237,8 +247,17 @@ static inline bsp_error_t bsp_read_array_allocator(bsp_array_t* array, hid_t f,
     return BSP_ERROR_MEMORY;
   }
 
-  herr_t status = H5Dread(dset, bsp_get_hdf5_native_type(type), H5S_ALL,
-                          H5S_ALL, H5P_DEFAULT, array->data);
+  if (array->size == 0) {
+    H5Tclose(hdf5_type);
+    H5Sclose(fspace);
+    H5Dclose(dset);
+    return BSP_SUCCESS;
+  }
+
+  hid_t native_type = bsp_get_hdf5_native_type(type);
+  herr_t status =
+      H5Dread(dset, native_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, array->data);
+  H5Tclose(hdf5_type);
 
   if (status < 0) {
     bsp_destroy_array_t(array);
