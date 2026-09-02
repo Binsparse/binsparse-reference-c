@@ -26,8 +26,10 @@ elif [[ -e "${tests_dir}" ]]; then
   echo "error: ${tests_dir} exists but is not a Git checkout" >&2
   exit 1
 else
-  git clone --depth 1 --branch "${tests_ref}" \
-    https://github.com/Binsparse/binsparse-tests.git "${tests_dir}"
+  git clone --depth 1 https://github.com/Binsparse/binsparse-tests.git \
+    "${tests_dir}"
+  git -C "${tests_dir}" fetch --depth 1 origin "${tests_ref}"
+  git -C "${tests_dir}" checkout --detach FETCH_HEAD
 fi
 
 (
