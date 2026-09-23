@@ -3,15 +3,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 cmake_minimum_required(VERSION 3.20)
-project(binsparse VERSION 1.0.0 LANGUAGES C)
+project(binsparse VERSION 1.0.0)
 
 cmake_policy(SET CMP0079 NEW)
 
 set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 
 # FIXME: -march=native is not portable
 # set(CMAKE_C_FLAGS "-O3 -march=native")
 set(CMAKE_C_FLAGS "-g ")
+set(CMAKE_CXX_FLAGS "-g ")
 
 option(ENABLE_SANITIZERS "Enable Clang sanitizers" OFF)
 

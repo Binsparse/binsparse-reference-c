@@ -402,3 +402,7 @@ static inline bool bsp_array_equal(bsp_array_t x, bsp_array_t y) {
   }
 
 #endif
+
+#ifdef __cplusplus
+#include <binsparse/detail/cpp/array.hpp>
+#endif
