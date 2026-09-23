@@ -41,6 +41,8 @@ jobs:
       CXX: ${{ matrix.cxx }}
     steps:
     - uses: actions/checkout@v4
+    - name: Install Julia
+      run: curl -fsSL https://install.julialang.org | sh -s -- -y
     - name: CMake
       run: |
         sudo apt-get update
@@ -85,6 +87,14 @@ jobs:
         cache: false
     - name: Matrix Tests
       run: ctest --test-dir ./build/test/bash
+    - name: Install Julia
+      run: curl -fsSL https://install.julialang.org | sh -s -- -y
+    - name: Disable Julia precompilation
+      run: julia -e 'using Pkg; Pkg.add(["PrecompileTools", "Preferences"]); using PrecompileTools, Preferences; set_preferences!(PrecompileTools, "precompile_workloads" => false; force=true)'
+    - name: Install Julia Packages
+      run: julia -e 'using Pkg; Pkg.add(["Finch", "HDF5"])'
+    - name: Tensor Tests
+      run: ctest --test-dir ./build/test/julia
     - name: Compliance Tests
       env:
         BINSPARSE_BUILD_DIR: ${{ github.workspace }}/build

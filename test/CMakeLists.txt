@@ -4,3 +4,4 @@
 
 add_subdirectory(bash)
 add_subdirectory(c)
+add_subdirectory(julia)
