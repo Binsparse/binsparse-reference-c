@@ -69,17 +69,17 @@ char* bsp_generate_json(bsp_matrix_t matrix, cJSON* user_json) {
     free(type_string);
   }
 
-  if (matrix.indices_0.data != NULL) {
+  if (matrix.indices_0.type != BSP_INVALID_TYPE) {
     cJSON_AddStringToObject(data_types, "indices_0",
                             bsp_get_type_string(matrix.indices_0.type));
   }
 
-  if (matrix.indices_1.data != NULL) {
+  if (matrix.indices_1.type != BSP_INVALID_TYPE) {
     cJSON_AddStringToObject(data_types, "indices_1",
                             bsp_get_type_string(matrix.indices_1.type));
   }
 
-  if (matrix.pointers_to_1.data != NULL) {
+  if (matrix.pointers_to_1.type != BSP_INVALID_TYPE) {
     cJSON_AddStringToObject(data_types, "pointers_to_1",
                             bsp_get_type_string(matrix.pointers_to_1.type));
   }
@@ -112,7 +112,7 @@ bsp_error_t bsp_write_matrix_to_group_cjson(hid_t f, bsp_matrix_t matrix,
     return error;
   }
 
-  if (matrix.indices_0.size > 0) {
+  if (matrix.indices_0.type != BSP_INVALID_TYPE) {
     error = bsp_write_array(f, (char*) "indices_0", matrix.indices_0,
                             compression_level);
     if (error != BSP_SUCCESS) {
@@ -120,7 +120,7 @@ bsp_error_t bsp_write_matrix_to_group_cjson(hid_t f, bsp_matrix_t matrix,
     }
   }
 
-  if (matrix.indices_1.size > 0) {
+  if (matrix.indices_1.type != BSP_INVALID_TYPE) {
     error = bsp_write_array(f, (char*) "indices_1", matrix.indices_1,
                             compression_level);
     if (error != BSP_SUCCESS) {
@@ -128,7 +128,7 @@ bsp_error_t bsp_write_matrix_to_group_cjson(hid_t f, bsp_matrix_t matrix,
     }
   }
 
-  if (matrix.pointers_to_1.size > 0) {
+  if (matrix.pointers_to_1.type != BSP_INVALID_TYPE) {
     error = bsp_write_array(f, (char*) "pointers_to_1", matrix.pointers_to_1,
                             compression_level);
     if (error != BSP_SUCCESS) {

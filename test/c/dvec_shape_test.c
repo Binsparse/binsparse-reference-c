@@ -52,7 +52,7 @@ static void check_read(const char* filename, bool parallel) {
 
 static void create_invalid_shape(const char* filename) {
   static const char* json =
-      "{\"binsparse\":{\"version\":\"0.1\",\"format\":\"DVEC\","
+      "{\"binsparse\":{\"version\":\"0.1.0\",\"format\":\"DVEC\","
       "\"shape\":[3,1],\"number_of_stored_values\":3,"
       "\"data_types\":{\"values\":\"float64\"}}}";
 

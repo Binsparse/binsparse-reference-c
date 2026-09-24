@@ -31,7 +31,7 @@ static inline hid_t bsp_get_hdf5_standard_type(bsp_type_t type) {
   } else if (type == BSP_FLOAT64) {
     return H5T_IEEE_F64LE;
   } else if (type == BSP_BINT8) {
-    return H5T_STD_I8LE;
+    return H5T_STD_U8LE;
   } else {
     return H5I_INVALID_HID;
   }
@@ -86,7 +86,7 @@ static inline bsp_type_t bsp_get_bsp_type(hid_t type) {
 //       way to generically determine the HDF5 native types for
 //       stdint's fixed width integer types.
 static inline hid_t bsp_get_hdf5_native_type(bsp_type_t type) {
-  if (type == BSP_INT8 || type == BSP_BINT8) {
+  if (type == BSP_INT8) {
     if (sizeof(int8_t) == sizeof(char)) {
       return H5T_NATIVE_CHAR;
     } else if (sizeof(int8_t) == sizeof(short)) {
@@ -142,7 +142,7 @@ static inline hid_t bsp_get_hdf5_native_type(bsp_type_t type) {
     } else {
       assert(false);
     }
-  } else if (type == BSP_UINT8) {
+  } else if (type == BSP_UINT8 || type == BSP_BINT8) {
     if (sizeof(uint8_t) == sizeof(unsigned char)) {
       return H5T_NATIVE_UCHAR;
     } else if (sizeof(uint8_t) == sizeof(unsigned short)) {

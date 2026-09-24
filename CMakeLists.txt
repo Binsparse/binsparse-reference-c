@@ -48,6 +48,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(cJSON)
 
+FetchContent_Declare(
+  semver_c
+  GIT_REPOSITORY https://github.com/h2non/semver.c.git
+  GIT_TAG v1.0.0
+)
+FetchContent_MakeAvailable(semver_c)
+add_library(binsparse_semver OBJECT ${semver_c_SOURCE_DIR}/semver.c)
+set_target_properties(binsparse_semver PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+target_include_directories(binsparse_semver PRIVATE
+    $<BUILD_INTERFACE:${semver_c_SOURCE_DIR}>)
+target_sources(binsparse PRIVATE $<TARGET_OBJECTS:binsparse_semver>)
+target_sources(binsparse_dynamic PRIVATE $<TARGET_OBJECTS:binsparse_semver>)
+target_include_directories(binsparse PRIVATE ${semver_c_SOURCE_DIR})
+target_include_directories(binsparse_dynamic PRIVATE ${semver_c_SOURCE_DIR})
+
 # Restore original BUILD_SHARED_LIBS setting
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_BACKUP})
 
@@ -121,6 +137,8 @@ install(FILES
 
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
   enable_testing()
+
+  add_subdirectory(test/compliance)
 
   if (ENABLE_SANITIZERS)
       set(SANITIZER_FLAGS "-fsanitize=address,undefined")

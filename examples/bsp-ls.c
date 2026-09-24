@@ -41,7 +41,14 @@ void print_group_info(hid_t g, const char* name) {
     assert(cJSON_IsString(version_));
     char* version_string = cJSON_GetStringValue(version_);
 
-    // TODO: check version.
+    error = bsp_check_version_compatible(version_string);
+    if (error != BSP_SUCCESS) {
+      printf("Unsupported Binsparse version %s: %s\n", version_string,
+             bsp_get_error_string(error));
+      cJSON_Delete(j);
+      free(json_string);
+      return;
+    }
 
     cJSON* format_ = cJSON_GetObjectItemCaseSensitive(binsparse, "format");
     assert(format_ != NULL);
